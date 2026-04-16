@@ -10,6 +10,7 @@
 //   "100644 hello.txt\0" followed by 32 raw bytes of SHA-256
 
 #include "tree.h"
+#include "index.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +22,11 @@
 #define MODE_FILE      0100644
 #define MODE_EXEC      0100755
 #define MODE_DIR       0040000
+
+static int compare_entries(const void *a, const void *b) {
+    const IndexEntry *ea = a, *eb = b;
+    return strcmp(ea->path, eb->path);
+}
 
 // ─── PROVIDED ───────────────────────────────────────────────────────────────
 
@@ -130,8 +136,13 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 //
 // Returns 0 on success, -1 on error.
 int tree_from_index(ObjectID *id_out) {
-    // TODO: Implement recursive tree building
-    // (See Lab Appendix for logical steps)
+    Index index;
+    if (index_load(&index) != 0) return -1;
+
+    // Sort index entries by path for easier processing
+    qsort(index.entries, index.count, sizeof(IndexEntry), compare_entries);
+
+    // TODO: Implement rest
     (void)id_out;
     return -1;
 }
