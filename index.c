@@ -16,6 +16,7 @@
 // TODO functions:     index_load, index_save, index_add
 
 #include "index.h"
+#include "tree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -214,8 +215,43 @@ int index_save(const Index *index) {
 //
 // Returns 0 on success, -1 on error.
 int index_add(Index *index, const char *path) {
-    // TODO: Implement file staging
-    // (See Lab Appendix for logical steps)
-    (void)index; (void)path;
-    return -1;
+    struct stat st;
+    if (stat(path, &st) != 0) return -1;
+
+    // Read file contents
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    uint8_t *data = malloc(st.st_size);
+    if (!data) {
+        fclose(f);
+        return -1;
+    }
+    if (fread(data, 1, st.st_size, f) != (size_t)st.st_size) {
+        fclose(f);
+        free(data);
+        return -1;
+    }
+    fclose(f);
+
+    // Write as blob
+    ObjectID id;
+    if (object_write(OBJ_BLOB, data, st.st_size, &id) != 0) {
+        free(data);
+        return -1;
+    }
+    free(data);
+
+    // Add/update index entry
+    IndexEntry *entry = index_find(index, path);
+    if (!entry) {
+        if (index->count >= MAX_INDEX_ENTRIES) return -1;
+        entry = &index->entries[index->count++];
+        strcpy(entry->path, path);
+    }
+    entry->mode = get_file_mode(path);
+    memcpy(&entry->hash, &id, sizeof(ObjectID));
+    entry->mtime_sec = st.st_mtime;
+    entry->size = st.st_size;
+
+    return index_save(index);
 }
