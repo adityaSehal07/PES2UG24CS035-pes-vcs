@@ -28,6 +28,17 @@ static int compare_entries(const void *a, const void *b) {
     return strcmp(ea->path, eb->path);
 }
 
+static int compare_tree_entries(const void *a, const void *b) {
+    const TreeEntry *ea = a, *eb = b;
+    return strcmp(ea->name, eb->name);
+}
+
+static int build_tree(const Index *index, int start, int end, ObjectID *id_out) {
+    // TODO: Implement recursive tree building
+    (void)index; (void)start; (void)end; (void)id_out;
+    return -1;
+}
+
 // ─── PROVIDED ───────────────────────────────────────────────────────────────
 
 // Determine the object mode for a filesystem path.
@@ -142,7 +153,5 @@ int tree_from_index(ObjectID *id_out) {
     // Sort index entries by path for easier processing
     qsort(index.entries, index.count, sizeof(IndexEntry), compare_entries);
 
-    // TODO: Implement rest
-    (void)id_out;
-    return -1;
+    return build_tree(&index, 0, index.count, id_out);
 }
