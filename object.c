@@ -118,9 +118,48 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     // 4. Compute SHA-256
     compute_hash(full_obj, full_len, id_out);
 
-    // TODO: Implement rest
+    // 5. Check for deduplication
+    if (object_exists(id_out)) {
+        free(full_obj);
+        return 0;
+    }
+
+    // 6. Prepare Paths and Directories
+    char path[512], dir[512], hex[HASH_HEX_SIZE + 1];
+    object_path(id_out, path, sizeof(path));
+    hash_to_hex(id_out, hex);
+    snprintf(dir, sizeof(dir), "%s/%.2s", OBJECTS_DIR, hex);
+
+    mkdir(OBJECTS_DIR, 0755);
+    mkdir(dir, 0755);
+
+    // 7. Write to temporary file (Atomic write pattern)
+    char tmp_path[512];
+    snprintf(tmp_path, sizeof(tmp_path), "%s/tmp_XXXXXX", dir);
+    int fd = mkstemp(tmp_path);
+    if (fd < 0) {
+        free(full_obj);
+        return -1;
+    }
+
+    if (write(fd, full_obj, full_len) != (ssize_t)full_len) {
+        close(fd);
+        unlink(tmp_path);
+        free(full_obj);
+        return -1;
+    }
+
+    close(fd);
+
+    // 8. Atomic rename
+    if (rename(tmp_path, path) != 0) {
+        unlink(tmp_path);
+        free(full_obj);
+        return -1;
+    }
+
     free(full_obj);
-    return -1;
+    return 0;
 }
 
 // Read an object from the store.
