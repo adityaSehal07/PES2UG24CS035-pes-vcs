@@ -34,9 +34,29 @@ static int compare_tree_entries(const void *a, const void *b) {
 }
 
 static int build_tree(const Index *index, int start, int end, ObjectID *id_out) {
-    // TODO: Implement recursive tree building
-    (void)index; (void)start; (void)end; (void)id_out;
-    return -1;
+    Tree tree;
+    tree.count = 0;
+
+    for (int i = start; i < end; i++) {
+        const char *path = index->entries[i].path;
+        if (strchr(path, '/')) continue; // Skip subdirs for now
+
+        TreeEntry *entry = &tree.entries[tree.count++];
+        entry->mode = index->entries[i].mode;
+        memcpy(&entry->hash, &index->entries[i].hash, sizeof(ObjectID));
+        strcpy(entry->name, path);
+    }
+
+    // Sort and serialize
+    qsort(tree.entries, tree.count, sizeof(TreeEntry), compare_tree_entries);
+
+    void *data;
+    size_t len;
+    if (tree_serialize(&tree, &data, &len) != 0) return -1;
+
+    int ret = object_write(OBJ_TREE, data, len, id_out);
+    free(data);
+    return ret;
 }
 
 // ─── PROVIDED ───────────────────────────────────────────────────────────────
