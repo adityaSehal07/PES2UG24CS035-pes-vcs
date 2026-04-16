@@ -37,14 +37,41 @@ static int build_tree(const Index *index, int start, int end, ObjectID *id_out) 
     Tree tree;
     tree.count = 0;
 
-    for (int i = start; i < end; i++) {
+    int i = start;
+    while (i < end) {
         const char *path = index->entries[i].path;
-        if (strchr(path, '/')) continue; // Skip subdirs for now
+        char *slash = strchr(path, '/');
+        if (!slash) {
+            // File in current dir
+            TreeEntry *entry = &tree.entries[tree.count++];
+            entry->mode = index->entries[i].mode;
+            memcpy(&entry->hash, &index->entries[i].hash, sizeof(ObjectID));
+            strcpy(entry->name, path);
+            i++;
+        } else {
+            // Directory
+            char dirname[256];
+            size_t dirlen = slash - path;
+            strncpy(dirname, path, dirlen);
+            dirname[dirlen] = '\0';
 
-        TreeEntry *entry = &tree.entries[tree.count++];
-        entry->mode = index->entries[i].mode;
-        memcpy(&entry->hash, &index->entries[i].hash, sizeof(ObjectID));
-        strcpy(entry->name, path);
+            // Find the end of this directory
+            int j = i;
+            while (j < end && strncmp(index->entries[j].path, dirname, dirlen) == 0 &&
+                   index->entries[j].path[dirlen] == '/') j++;
+
+            // Recursively build subtree
+            ObjectID sub_id;
+            if (build_tree(index, i, j, &sub_id) != 0) return -1;
+
+            // Add to tree
+            TreeEntry *entry = &tree.entries[tree.count++];
+            entry->mode = MODE_DIR;
+            memcpy(&entry->hash, &sub_id, sizeof(ObjectID));
+            strcpy(entry->name, dirname);
+
+            i = j;
+        }
     }
 
     // Sort and serialize
